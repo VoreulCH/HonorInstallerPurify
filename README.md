@@ -10,11 +10,13 @@
 > human review and PRs are welcome.
 
 面向荣耀 MagicOS 系统「软件包安装程序」`com.android.packageinstaller` 的 LSPosed 模块：
-**跳过安装第三方 APK 时的联网安全检测与安装前指纹验证**，点开即装。
+**跳过安装第三方 APK 时的联网安全检测与安装前指纹验证**，点开即装；同时**禁止安装器联网上报**、**展示安装包信息卡**，并**允许降级安装**低版本 APK。
 
 An LSPosed module targeting Honor MagicOS's stock PackageInstaller
 (`com.android.packageinstaller`): it **skips the online security scan and the
 pre-install fingerprint prompt** when sideloading APKs — tap and install, no waiting.
+It also **blocks the installer's network access**, **shows an APK info card**,
+and **allows version downgrades**.
 
 ## 为什么做这个模块 / Why
 
@@ -35,11 +37,16 @@ lock-screen prompt may also gate the install. This module removes both.
 
 | 功能 Feature | 说明 Description |
 | --- | --- |
-| 跳过联网安全检测 / Skip online security check | Hook 检测总入口 `ly1.h()`，直接投递官方「免检测通过」结果；安装按钮秒亮，不转圈、不联网、不调手机管家扫描 / Hooks the single check entry point and immediately delivers the system's own "trusted source, no check needed" result — install button lights up instantly |
+| 跳过联网安全检测 / Skip online security check | Hook 检测总入口 `ly1.h()`，直接投递官方「免检测通过」结果；安装按钮秒亮，不转圈、不调手机管家扫描 / Hooks the single check entry point and immediately delivers the system's own "trusted source, no check needed" result — install button lights up instantly |
 | 跳过安装前指纹 / Skip pre-install fingerprint | Hook 安装流程指纹入口 `qf2.g()`，直接回调验证成功 / Hooks the install-flow fingerprint entry and reports success immediately |
+| 禁止安装器联网 / Block installer network | Hook `Socket.connect()`，安装器进程内一切联网尝试立即失败，不再云端上报 / Hooks `Socket.connect` in the installer process — every network attempt fails instantly, nothing is reported |
+| 展示安装包信息卡 / APK info card | 借壳原「安全模式」卡片显示：版本（覆盖安装时新旧对比）、大小、SDK、架构、包名；降级安装红字标注 / Repurposes the safe-mode card to show version (old → new on updates), size, SDK, ABI and package name; downgrades flagged in red |
+| 允许降级安装 / Allow downgrade | 安装低版本 APK 不再报「系统已经存在较高版本」：安装器侧补 `INSTALL_ALLOW_DOWNGRADE` 标志 + system_server 侧放行降级校验（需勾选「系统框架」作用域）/ Adds the downgrade install flag on the installer side and bypasses the downgrade check in system_server (requires the System Framework scope) |
 | 隐藏"未发现风险"横幅 / Hide "no risk" banner | Hook `PackageInstallerActivity.e2()/k2()`，结果横幅渲染后置为 GONE / Hides the check-result banner after render |
-| 隐藏"安全模式"推广卡片 / Hide safe-mode promo card | Hook 卡片显示决策 `r12.j()` 恒返 false、底部弹窗 `r12.s()` 置空，安装前后页面均生效 / Gates the safe-mode card off on both pre- and post-install pages |
+| 隐藏"安全模式"推广卡片 / Hide safe-mode promo card | Hook 卡片显示决策 `r12.j()`、底部弹窗 `r12.s()` 置空，安装前后页面均生效 / Gates the safe-mode card off on both pre- and post-install pages |
 | 屏蔽"用过该应用的还喜欢"推荐 / Block "you may also like" strip | Hook 广告请求入口 `AbstractAdBusinessPresenter.l()` 置空，直接不发起广告请求 / No-ops the ad request entry so the recommendation strip never loads |
+| 屏蔽"清理缓存"提醒 / Hide cache-clean prompt | Hook `z62.E()` 恒返 true，安装页不再弹「清理缓存」提醒 / Suppresses the cache-clean prompt on the install page |
+| 断网秒开 / No offline delay | Hook 分流请求 `g82.f()` 直接走失败分支，断网时不再死等 2 秒超时 / Short-circuits the diversion request so an offline install no longer waits out the 2s timeout |
 | 不动设置页验证 / Settings prompts untouched | 安装器设置页的指纹入口 `qf2.h()` 未 Hook，其余系统行为不受影响 / The settings-page auth entry is deliberately left alone |
 
 ## 原理 / How it works
@@ -88,10 +95,10 @@ recommendation strip.
 
 1. 下载安装 [最新 Release](../../releases) 的 APK（模块无界面，装完在 LSPosed/Vector 里可见）。
    Install the APK from [Releases](../../releases) (no launcher UI; it appears in your LSPosed manager).
-2. 在 LSPosed/Vector 中启用「荣耀安装器净化」，作用域勾选 **软件包安装程序**。
-   Enable the module and select the **Package Installer** (`com.android.packageinstaller`) scope.
-3. 强制停止「软件包安装程序」或重启手机使 Hook 生效。
-   Force-stop Package Installer (or reboot) for the hooks to take effect.
+2. 在 LSPosed/Vector 中启用「荣耀安装器净化」，作用域勾选 **软件包安装程序**；如需降级安装功能，再勾选 **系统框架（Android 系统）**。
+   Enable the module and select the **Package Installer** (`com.android.packageinstaller`) scope; for the downgrade feature also select **System Framework** (`android`).
+3. 强制停止「软件包安装程序」或重启手机使 Hook 生效（勾选系统框架后必须重启）。
+   Force-stop Package Installer (or reboot) for the hooks to take effect (reboot is required after enabling the System Framework scope).
 4. 点击任意 APK 测试：应直接出现「开始安装」，无转圈、无指纹弹窗。
    Tap any APK: the install button should be ready immediately, no spinner, no fingerprint.
 
@@ -138,6 +145,11 @@ at any JRE 8+.
 
 ## 版本历史 / Changelog
 
+* **3.2**（2026-09-24）：允许降级安装——安装低版本 APK 不再报「系统已经存在较高版本」，信息卡红字标注「↓ 降级安装」；需在作用域勾选「系统框架」并重启。
+* **3.1**（2026-09-24）：信息卡——借壳原「安全模式」卡片展示版本、大小、SDK、架构、包名，覆盖安装显示新旧对比；右上角「by VoreulCH」作者标识可点击跳转仓库。
+* **3.0**（2026-09-22）：描述更新，模块更名「荣耀安装器净化」。
+* **2.2**（2026-09-22）：修复断网后解析安装包慢 2 秒的问题（Hook 分流请求 `g82.f()` 直接走失败分支，2178ms → 198ms）。
+* **2.1**（2026-09-22）：禁止安装器联网上报（`Socket.connect`）；隐藏「清理缓存」提醒。
 * **2.0**（2026-09-22）：界面净化——隐藏「未发现风险」横幅、「安全模式 建议开启」卡片（安装前后两页）、屏蔽「用过该应用的还喜欢」推荐条；修复广告 Hook 的混淆类名解析。
 * **1.0**（2026-09-22）：首个版本——跳过联网安全检测与安装前指纹验证。
 
