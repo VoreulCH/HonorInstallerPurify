@@ -83,8 +83,8 @@ recommendation strip.
 
 * 已 root 的荣耀 MagicOS 设备：Magisk / KernelSU / ReSukkiSU + LSPosed（或 Vector 等第三方管理器）。
   A rooted Honor MagicOS device: Magisk / KernelSU / ReSukkiSU + LSPosed (or a third-party manager such as Vector).
-* 实测适配：MagicOS 11（Android 17）自带 PackageInstaller。
-  Tested against the PackageInstaller shipping with MagicOS 11 (Android 17).
+* 实测适配：MagicOS 11（Android 17）自带 PackageInstaller（4.0）；MagicOS 10（Android 16）使用 3.2。
+  Tested against MagicOS 11 (Android 17) PackageInstaller with v4.0; MagicOS 10 (Android 16) users should use v3.2.
 
 > 安装器经过代码混淆，其他系统版本的类名可能变化导致功能静默失效；
 > 可在 LSPosed 日志过滤 `InstallBypass` 查看 `hook ok / skipped / bypassed` 行确认 Hook 是否命中。
@@ -93,8 +93,8 @@ recommendation strip.
 
 ## 使用方法 / Usage
 
-1. 下载安装 [最新 Release](../../releases) 的 APK（模块无界面，装完在 LSPosed/Vector 里可见）。
-   Install the APK from [Releases](../../releases) (no launcher UI; it appears in your LSPosed manager).
+1. 根据系统版本选择对应 [Release](../../releases)：MagicOS 11 用 4.0，MagicOS 10 用 3.2。模块无界面，装完在 LSPosed/Vector 里可见。
+   Pick the Release matching your OS: 4.0 for MagicOS 11, 3.2 for MagicOS 10 (no launcher UI; it appears in your LSPosed manager).
 2. 在 LSPosed/Vector 中启用「荣耀安装器净化」，作用域勾选 **软件包安装程序**；如需降级安装功能，再勾选 **系统框架（Android 系统）**。
    Enable the module and select the **Package Installer** (`com.android.packageinstaller`) scope; for the downgrade feature also select **System Framework** (`android`).
 3. 强制停止「软件包安装程序」或重启手机使 Hook 生效（勾选系统框架后必须重启）。
@@ -143,8 +143,19 @@ at any JRE 8+.
 └── build.ps1                  # 一键构建流水线 / one-shot build pipeline
 ```
 
+## 版本选择 / Version selection
+
+| 系统版本 / OS | 推荐版本 / Recommended | 说明 |
+| --- | --- | --- |
+| **MagicOS 11（Android 17）** | **4.0** | 重新适配 MagicOS 11 PackageInstaller 的混淆类名 / Re-adapted for MagicOS 11 PI obfuscation |
+| **MagicOS 10（Android 16）** | **3.2** | 3.2 在 MagicOS 10 上稳定运行；MagicOS 11 因 PI 混淆变化不兼容 / 3.2 is stable on MagicOS 10; MagicOS 11 changed PI obfuscation and is incompatible |
+
+> 装错版本不会变砖——Hook 类名不匹配时功能静默失效，模块本身不报错。
+> Installing the wrong version won't brick anything — mismatched class names just silently fail.
+
 ## 版本历史 / Changelog
 
+* **4.0**（2026-09-30）：**MagicOS 11 适配版**——重新适配 MagicOS 11（Android 17）PackageInstaller 的混淆类名；移除「不同签名覆盖安装」功能（描述简化为「跳过验证/禁止联网/展示信息/允许降级」）；versionCode 提升至 13。MagicOS 10 用户请继续使用 3.2。
 * **3.2**（2026-09-24）：允许降级安装——安装低版本 APK 不再报「系统已经存在较高版本」，信息卡红字标注「↓ 降级安装」；需在作用域勾选「系统框架」并重启。
 * **3.1**（2026-09-24）：信息卡——借壳原「安全模式」卡片展示版本、大小、SDK、架构、包名，覆盖安装显示新旧对比；右上角「by VoreulCH」作者标识可点击跳转仓库。
 * **3.0**（2026-09-22）：描述更新，模块更名「荣耀安装器净化」。
